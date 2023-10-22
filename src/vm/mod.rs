@@ -19,10 +19,15 @@ impl Guest {
     pub fn new(ctx: &Context) -> Self {
         let vm = ctx.get_kvm().create_vm().unwrap();
 
-        // TODO: ioctl KVM_SET_TSS_ADDR
-        // TODO: KVM_SET_IDENTITY_MAP_ADDR
-        // TODO: KVM_CREATE_IRQCHIP
-        // TODO: KVM_CREATE_PIT2
+        vm.set_tss_address(0xffffd000).unwrap();
+        let map_addr = 0xffffc000;
+        vm.set_identity_map_address(map_addr).unwrap();
+        vm.create_irq_chip().unwrap();
+        vm.create_pit2(kvm_bindings::kvm_pit_config {
+            flags: 0,
+            pad: [0; 15],
+        })
+        .unwrap();
 
         let mem: *mut u8 = unsafe {
             libc::mmap(
@@ -35,13 +40,12 @@ impl Guest {
             ) as *mut u8
         };
 
-        let slot = 0;
         let mem_region = kvm_userspace_memory_region {
-            slot,
+            slot: 0,
+            flags: 0,
             guest_phys_addr: 0,
             memory_size: MEM_SIZE as u64,
             userspace_addr: mem as u64,
-            flags: KVM_MEM_LOG_DIRTY_PAGES,
         };
         unsafe { vm.set_user_memory_region(mem_region).unwrap() };
 
@@ -64,24 +68,32 @@ impl Guest {
             eprintln!("Image file is too big");
             std::process::exit(1);
         }
-        /*
-        // TODO: unnecessary?
-        unsafe {
-            for (i, b) in image.iter().enumerate() {
-                *(self.mem.wrapping_add(i)) = *b;
-            }
-        }
-        */
 
         unsafe {
             let boot_params = self.mem.wrapping_add(0x10000) as *mut boot_params;
             let cmdline = self.mem.wrapping_add(0x20000);
-            let kernel = self.mem.wrapping_add(0x100000);
+            let kernel = self.mem.wrapping_add(0x10_0000);
+
+            println!(
+                "[LOG] boot_params = phys {:#x}",
+                boot_params as usize - self.mem as usize
+            );
+            println!(
+                "[LOG] cmdline = phys {:#x}",
+                cmdline as usize - self.mem as usize
+            );
+            println!(
+                "[LOG] kernel = phys {:#x}",
+                kernel as usize - self.mem as usize
+            );
 
             // Initialize boot parameters
-            println!("[LOG] Copy boot parameters");
+            println!(
+                "[LOG] Copy boot parameters to phys {:#x}",
+                boot_params as usize - self.mem as usize
+            );
             *boot_params = *(image.as_ptr() as *const boot_params);
-            let setup_sectors = (*boot_params).hdr.setup_sects as usize;
+            let setup_sectors = boot_params.as_mut().unwrap().hdr.setup_sects as usize;
             let setup_size = (setup_sectors + 1) * 512;
             (*boot_params).hdr.vid_mode = 0xFFFF; // VGA
             (*boot_params).hdr.type_of_loader = 0xFF;
@@ -106,6 +118,7 @@ impl Guest {
             }
 
             // Copy kernel part
+            println!("[LOG] Setup size = {:#x}", setup_size);
             println!("[LOG] Kernel size = {:#x}", image.len() - setup_size);
             for i in 0..(image.len() - setup_size) {
                 *(kernel.wrapping_add(i)) =

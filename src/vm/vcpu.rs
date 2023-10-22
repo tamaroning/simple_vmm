@@ -4,9 +4,6 @@ use kvm_ioctls::VmFd;
 
 use crate::Context;
 
-const INITIAL_RIP: u64 = 0x10_0000; // TODO: replace
-const INITIAL_RSI: u64 = 0x1_0000;
-
 pub struct VCPU {
     vcpu_fd: VcpuFd,
 }
@@ -59,8 +56,8 @@ impl VCPU {
 
     fn init_regs(&self) {
         let mut vcpu_regs = self.vcpu_fd.get_regs().unwrap();
-        vcpu_regs.rip = INITIAL_RIP;
-        vcpu_regs.rsi = INITIAL_RSI;
+        vcpu_regs.rip = 0x10_0000;
+        vcpu_regs.rsi = 0x1_0000;
         vcpu_regs.rflags = 2;
         self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
     }
@@ -69,11 +66,10 @@ impl VCPU {
     fn init_cpu_id(&self, ctx: &Context) {
         const NUM_ENTRY: usize = kvm_bindings::KVM_MAX_CPUID_ENTRIES;
 
-        let mut fam = ctx.get_kvm().get_supported_cpuid(NUM_ENTRY).unwrap();
-
-        for entry in fam.as_mut_slice() {
+        let mut cpuid = ctx.get_kvm().get_supported_cpuid(NUM_ENTRY).unwrap();
+        for entry in cpuid.as_mut_slice() {
             if entry.function == /* KVM_CPUID_SIGNATURE */ 0x40000000 {
-                entry.eax = /* KVM_CPUID_FEATURES */0x40000001;
+                entry.eax = /* KVM_CPUID_FEATURES */ 0x40000001;
                 entry.ebx = 0x4b4d564b; // KVMK
                 entry.ecx = 0x564b4d56; // VMKV
                 entry.edx = 0x4d; // M
@@ -103,15 +99,6 @@ impl VCPU {
                 VcpuExit::MmioWrite(addr, _data) => {
                     println!("Received an MMIO Write Request to the address {:#x}.", addr);
                     //dbg!(data);
-                    // The code snippet dirties 1 page when it is loaded in memory
-                    /*
-                    let dirty_pages_bitmap = vm.get_dirty_log(slot, mem_size).unwrap();
-                    let dirty_pages = dirty_pages_bitmap
-                        .into_iter()
-                        .map(|page| page.count_ones())
-                        .fold(0, |dirty_page_count, i| dirty_page_count + i);
-                    assert_eq!(dirty_pages, 1);
-                    */
                 }
                 VcpuExit::Hlt => {
                     println!("Halt");
