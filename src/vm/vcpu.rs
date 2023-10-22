@@ -4,7 +4,7 @@ use kvm_ioctls::VmFd;
 
 use crate::Context;
 
-const INITIAL_RIP: u64 = 0; //0x10_0000; // TODO: replace
+const INITIAL_RIP: u64 = 0x10_0000; // TODO: replace
 const INITIAL_RSI: u64 = 0x1_0000;
 
 pub struct VCPU {
