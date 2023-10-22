@@ -28,6 +28,7 @@ fn main() {
 
     let ctx = Context::new();
 
-    let mut guest = Guest::new(&ctx, &args[1]);
+    let mut guest = Guest::new(&ctx);
+    guest.load(&args[1]);
     guest.run();
 }

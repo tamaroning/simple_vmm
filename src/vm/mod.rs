@@ -16,14 +16,13 @@ pub struct Guest {
 }
 
 impl Guest {
-    pub fn new(ctx: &Context, image_file: &str) -> Self {
+    pub fn new(ctx: &Context) -> Self {
         let vm = ctx.get_kvm().create_vm().unwrap();
 
         // TODO: ioctl KVM_SET_TSS_ADDR
         // TODO: KVM_SET_IDENTITY_MAP_ADDR
         // TODO: KVM_CREATE_IRQCHIP
         // TODO: KVM_CREATE_PIT2
-        // TODO:
 
         let mem: *mut u8 = unsafe {
             libc::mmap(
@@ -46,19 +45,6 @@ impl Guest {
         };
         unsafe { vm.set_user_memory_region(mem_region).unwrap() };
 
-        unsafe {
-            println!("Open image file: {}", image_file);
-            let buf = std::fs::read(image_file).unwrap();
-            if buf.len() > MEM_SIZE {
-                eprintln!("Image file is too big");
-                std::process::exit(1);
-            }
-            dbg!(buf.len());
-            for (i, b) in buf.iter().enumerate() {
-                *(mem.wrapping_add(i)) = *b;
-            }
-        }
-
         println!(
             "ioctl KVM_GET_VCPU_MMAP_SIZE = {:#x}",
             ctx.get_kvm().get_vcpu_mmap_size().unwrap()
@@ -70,7 +56,22 @@ impl Guest {
         Guest { vcpu, vm, mem }
     }
 
-    pub fn get_mem_size() -> usize {
+    pub fn load(&self, image_file: &str) {
+        unsafe {
+            println!("Open image file: {}", image_file);
+            let buf = std::fs::read(image_file).unwrap();
+            if buf.len() > MEM_SIZE {
+                eprintln!("Image file is too big");
+                std::process::exit(1);
+            }
+            dbg!(buf.len());
+            for (i, b) in buf.iter().enumerate() {
+                *(self.mem.wrapping_add(i)) = *b;
+            }
+        }
+    }
+
+    fn get_mem_size(&self) -> usize {
         MEM_SIZE
     }
 
