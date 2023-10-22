@@ -1,13 +1,13 @@
 mod vcpu;
 
-use kvm_bindings::{kvm_userspace_memory_region, KVM_MEM_LOG_DIRTY_PAGES};
+use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::VmFd;
 use linux_loader::loader::bootparam::{boot_params, CAN_USE_HEAP, KEEP_SEGMENTS};
 use vcpu::VCPU;
 
 use crate::Context;
 
-const MEM_SIZE: usize = 1 << 30;
+const MEM_SIZE: usize = 1 << 30; // 1GB
 
 pub struct Guest {
     vm: VmFd,
@@ -20,8 +20,7 @@ impl Guest {
         let vm = ctx.get_kvm().create_vm().unwrap();
 
         vm.set_tss_address(0xffffd000).unwrap();
-        let map_addr = 0xffffc000;
-        vm.set_identity_map_address(map_addr).unwrap();
+        vm.set_identity_map_address(0xffffc000).unwrap();
         vm.create_irq_chip().unwrap();
         vm.create_pit2(kvm_bindings::kvm_pit_config {
             flags: 0,
@@ -34,7 +33,7 @@ impl Guest {
                 std::ptr::null_mut(),
                 MEM_SIZE,
                 libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
                 -1,
                 0,
             ) as *mut u8
@@ -68,10 +67,11 @@ impl Guest {
             eprintln!("Image file is too big");
             std::process::exit(1);
         }
+        println!("[LOG] Image size = {:#x}", image.len());
 
         unsafe {
-            let boot_params = self.mem.wrapping_add(0x10000) as *mut boot_params;
-            let cmdline = self.mem.wrapping_add(0x20000);
+            let boot_params = self.mem.wrapping_add(0x1_0000) as *mut boot_params;
+            let cmdline = self.mem.wrapping_add(0x2_0000);
             let kernel = self.mem.wrapping_add(0x10_0000);
 
             println!(
@@ -94,6 +94,7 @@ impl Guest {
             );
             *boot_params = *(image.as_ptr() as *const boot_params);
             let setup_sectors = boot_params.as_mut().unwrap().hdr.setup_sects as usize;
+            println!("[LOG] setup_sectors = {:#x}", setup_sectors);
             let setup_size = (setup_sectors + 1) * 512;
             (*boot_params).hdr.vid_mode = 0xFFFF; // VGA
             (*boot_params).hdr.type_of_loader = 0xFF;
@@ -102,7 +103,7 @@ impl Guest {
             (*boot_params).hdr.loadflags |= CAN_USE_HEAP as u8 | 0x01 | KEEP_SEGMENTS as u8;
             (*boot_params).hdr.heap_end_ptr = 0xFE00;
             (*boot_params).hdr.ext_loader_ver = 0x0;
-            (*boot_params).hdr.cmd_line_ptr = 0x20000;
+            (*boot_params).hdr.cmd_line_ptr = 0x2_0000;
 
             // Clear command line
             println!("[LOG] Initalize kernel command line");
@@ -110,20 +111,41 @@ impl Guest {
                 *(cmdline.wrapping_add(i as usize)) = 0;
             }
             // Append "console=ttyS0\0" to command line
-            let tty_string = [
+            const TTY_STRING: [u8; 14] = [
                 b'c', b'o', b'n', b's', b'o', b'l', b'e', b'=', b't', b't', b'y', b'S', b'0', b'\0',
             ];
-            for i in 0..tty_string.len() {
-                *(cmdline.wrapping_add(i)) = tty_string[i];
+            for i in 0..TTY_STRING.len() {
+                *(cmdline.wrapping_add(i)) = TTY_STRING[i];
             }
 
             // Copy kernel part
+            let kernel_size = image.len() - setup_size;
             println!("[LOG] Setup size = {:#x}", setup_size);
-            println!("[LOG] Kernel size = {:#x}", image.len() - setup_size);
-            for i in 0..(image.len() - setup_size) {
+            println!("[LOG] Kernel size = {:#x}", kernel_size);
+            for i in 0..kernel_size {
                 *(kernel.wrapping_add(i)) =
                     *(image.as_ptr().wrapping_add(setup_size).wrapping_add(i));
             }
+
+            dbg!(*(kernel.wrapping_add(0)));
+            dbg!(*(kernel.wrapping_add(1)));
+            dbg!(*(kernel.wrapping_add(2)));
+
+            dbg!(*(cmdline.wrapping_add(0)) as char);
+            dbg!(*(cmdline.wrapping_add(1)) as char);
+            dbg!(*(cmdline.wrapping_add(2)) as char);
+            dbg!(*(cmdline.wrapping_add(3)) as char);
+            dbg!(*(cmdline.wrapping_add(4)) as char);
+            dbg!(*(cmdline.wrapping_add(5)) as char);
+            dbg!(*(cmdline.wrapping_add(6)) as char);
+            dbg!(*(cmdline.wrapping_add(7)) as char);
+            dbg!(*(cmdline.wrapping_add(8)) as char);
+            dbg!(*(cmdline.wrapping_add(9)) as char);
+            dbg!(*(cmdline.wrapping_add(10)) as char);
+            dbg!(*(cmdline.wrapping_add(11)) as char);
+            dbg!(*(cmdline.wrapping_add(12)) as char);
+            dbg!(*(cmdline.wrapping_add(13)) as char);
+
         }
     }
 
