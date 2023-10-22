@@ -1,13 +1,59 @@
 use kvm_ioctls::VcpuExit;
 use kvm_ioctls::VcpuFd;
+use kvm_ioctls::VmFd;
+
+use super::PROGRAM_START;
 
 pub struct VCPU {
     vcpu_fd: VcpuFd,
 }
 
 impl VCPU {
-    pub fn new(fd: VcpuFd) -> Self {
-        VCPU { vcpu_fd: fd }
+    pub fn new(vm: &VmFd) -> Self {
+        // Create one vCPU
+        let vcpu_fd = vm.create_vcpu(0).unwrap();
+
+        // x86_64 specific registry setup
+        let mut vcpu_sregs = vcpu_fd.get_sregs().unwrap();
+
+        vcpu_sregs.cs.base = 0;
+        vcpu_sregs.cs.limit = u32::MAX;
+        vcpu_sregs.cs.g = 0;
+
+        vcpu_sregs.ds.base = 0;
+        vcpu_sregs.ds.limit = u32::MAX;
+        vcpu_sregs.ds.g = 1;
+
+        vcpu_sregs.fs.base = 0;
+        vcpu_sregs.fs.limit = u32::MAX;
+        vcpu_sregs.fs.g = 1;
+
+        vcpu_sregs.gs.base = 0;
+        vcpu_sregs.gs.limit = u32::MAX;
+        vcpu_sregs.gs.g = 1;
+
+        vcpu_sregs.es.base = 0;
+        vcpu_sregs.es.limit = u32::MAX;
+        vcpu_sregs.es.g = 1;
+
+        vcpu_sregs.ss.base = 0;
+        vcpu_sregs.ss.limit = u32::MAX;
+        vcpu_sregs.ss.g = 1;
+
+        vcpu_sregs.cs.db = 1;
+        vcpu_sregs.ss.db = 1;
+        vcpu_sregs.cr0 |= 1; /* enable protected mode */
+
+        vcpu_fd.set_sregs(&vcpu_sregs).unwrap();
+
+        let mut vcpu_regs = vcpu_fd.get_regs().unwrap();
+        vcpu_regs.rip = PROGRAM_START;
+        vcpu_regs.rflags = 2;
+        vcpu_fd.set_regs(&vcpu_regs).unwrap();
+
+        println!("RIP = {:#x}", vcpu_regs.rip);
+
+        VCPU { vcpu_fd }
     }
 
     pub fn run(&mut self) {
