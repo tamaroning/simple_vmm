@@ -1,10 +1,5 @@
 mod vm;
 
-use std::{
-    cell::OnceCell,
-    sync::{Mutex, OnceLock},
-};
-
 use kvm_ioctls::Kvm;
 use vm::Guest;
 

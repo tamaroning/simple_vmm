@@ -19,6 +19,12 @@ impl Guest {
     pub fn new(ctx: &Context, image_file: &str) -> Self {
         let vm = ctx.get_kvm().create_vm().unwrap();
 
+        // TODO: ioctl KVM_SET_TSS_ADDR
+        // TODO: KVM_SET_IDENTITY_MAP_ADDR
+        // TODO: KVM_CREATE_IRQCHIP
+        // TODO: KVM_CREATE_PIT2
+        // TODO:
+
         let mem: *mut u8 = unsafe {
             libc::mmap(
                 std::ptr::null_mut(),
@@ -58,11 +64,10 @@ impl Guest {
             ctx.get_kvm().get_vcpu_mmap_size().unwrap()
         );
 
-        Guest {
-            vcpu: VCPU::new(&vm),
-            vm,
-            mem,
-        }
+        // Create and init vCPU
+        let vcpu = VCPU::new(ctx, &vm);
+
+        Guest { vcpu, vm, mem }
     }
 
     pub fn get_mem_size() -> usize {

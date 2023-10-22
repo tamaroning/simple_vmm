@@ -1,8 +1,8 @@
-use kvm_bindings::kvm_cpuid_entry;
-use kvm_bindings::kvm_cpuid_entry2;
 use kvm_ioctls::VcpuExit;
 use kvm_ioctls::VcpuFd;
 use kvm_ioctls::VmFd;
+
+use crate::Context;
 
 const INITIAL_RIP: u64 = 0; //0x10_0000; // TODO: replace
 const INITIAL_RSI: u64 = 0x1_0000;
@@ -12,19 +12,18 @@ pub struct VCPU {
 }
 
 impl VCPU {
-    pub fn new(vm: &VmFd) -> Self {
-        // Create one vCPU
+    pub fn new(ctx: &Context, vm: &VmFd) -> Self {
         let vcpu_fd = vm.create_vcpu(0).unwrap();
         let vcpu = VCPU { vcpu_fd };
 
+        // x86_64 specific registry setup
         vcpu.init_sregs();
         vcpu.init_regs();
-        vcpu.init_cpu_id();
+        vcpu.init_cpu_id(ctx);
         vcpu
     }
 
     fn init_sregs(&self) {
-        // x86_64 specific registry setup
         let mut vcpu_sregs = self.vcpu_fd.get_sregs().unwrap();
 
         vcpu_sregs.cs.base = 0;
@@ -66,15 +65,20 @@ impl VCPU {
         self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
     }
 
-    fn init_cpu_id(&self) {
-        const NUM_ENTRY: usize = 100;
-        struct KvmCpuId {
-            num_entry: u32,
-            padding: u32,
-            entries: [kvm_cpuid_entry2; NUM_ENTRY],
-        }
+    // See 4.20 KVM_SET_CPUID, https://www.kernel.org/doc/Documentation/virtual/kvm/api.txt
+    fn init_cpu_id(&self, ctx: &Context) {
+        const NUM_ENTRY: usize = kvm_bindings::KVM_MAX_CPUID_ENTRIES;
 
-        // TODO: implement
+        let mut fam = ctx.get_kvm().get_supported_cpuid(NUM_ENTRY).unwrap();
+
+        for entry in fam.as_mut_slice() {
+            if entry.function == /* KVM_CPUID_SIGNATURE */ 0x40000000 {
+                entry.eax = /* KVM_CPUID_FEATURES */0x40000001;
+                entry.ebx = 0x4b4d564b; // KVMK
+                entry.ecx = 0x564b4d56; // VMKV
+                entry.edx = 0x4d; // M
+            }
+        }
     }
 
     pub fn run(&mut self) {
