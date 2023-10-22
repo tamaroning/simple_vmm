@@ -3,3 +3,5 @@
 examples/*
 !examples/*.S
 !examples/test-bzImage*
+
+.vscode
