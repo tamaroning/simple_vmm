@@ -1,8 +1,11 @@
+use kvm_bindings::kvm_cpuid_entry;
+use kvm_bindings::kvm_cpuid_entry2;
 use kvm_ioctls::VcpuExit;
 use kvm_ioctls::VcpuFd;
 use kvm_ioctls::VmFd;
 
-use super::PROGRAM_START;
+const INITIAL_RIP: u64 = 0; //0x10_0000; // TODO: replace
+const INITIAL_RSI: u64 = 0x1_0000;
 
 pub struct VCPU {
     vcpu_fd: VcpuFd,
@@ -14,9 +17,9 @@ impl VCPU {
         let vcpu_fd = vm.create_vcpu(0).unwrap();
         let vcpu = VCPU { vcpu_fd };
 
-        vcpu.init_regs();
         vcpu.init_sregs();
-
+        vcpu.init_regs();
+        vcpu.init_cpu_id();
         vcpu
     }
 
@@ -57,11 +60,21 @@ impl VCPU {
 
     fn init_regs(&self) {
         let mut vcpu_regs = self.vcpu_fd.get_regs().unwrap();
-        vcpu_regs.rip = PROGRAM_START;
+        vcpu_regs.rip = INITIAL_RIP;
+        vcpu_regs.rsi = INITIAL_RSI;
         vcpu_regs.rflags = 2;
         self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
+    }
 
-        println!("RIP = {:#x}", vcpu_regs.rip);
+    fn init_cpu_id(&self) {
+        const NUM_ENTRY: usize = 100;
+        struct KvmCpuId {
+            num_entry: u32,
+            padding: u32,
+            entries: [kvm_cpuid_entry2; NUM_ENTRY],
+        }
+
+        // TODO: implement
     }
 
     pub fn run(&mut self) {

@@ -1,13 +1,13 @@
 mod vcpu;
 
 use kvm_bindings::{kvm_userspace_memory_region, KVM_MEM_LOG_DIRTY_PAGES};
-use kvm_ioctls::Kvm;
 use kvm_ioctls::VmFd;
 
 use vcpu::VCPU;
 
+use crate::Context;
+
 const MEM_SIZE: usize = 1 << 30;
-const PROGRAM_START: u64 = 0x0;
 
 pub struct Guest {
     vm: VmFd,
@@ -16,8 +16,8 @@ pub struct Guest {
 }
 
 impl Guest {
-    pub fn new(kvm: &mut Kvm, image_file: &str) -> Self {
-        let vm = kvm.create_vm().unwrap();
+    pub fn new(ctx: &Context, image_file: &str) -> Self {
+        let vm = ctx.get_kvm().create_vm().unwrap();
 
         let mem: *mut u8 = unsafe {
             libc::mmap(
@@ -33,9 +33,9 @@ impl Guest {
         let slot = 0;
         let mem_region = kvm_userspace_memory_region {
             slot,
-            guest_phys_addr: PROGRAM_START, // ゲストの物理メモリ
+            guest_phys_addr: 0,
             memory_size: MEM_SIZE as u64,
-            userspace_addr: mem as u64, // ホスト側のメモリ領域
+            userspace_addr: mem as u64,
             flags: KVM_MEM_LOG_DIRTY_PAGES,
         };
         unsafe { vm.set_user_memory_region(mem_region).unwrap() };
@@ -55,7 +55,7 @@ impl Guest {
 
         println!(
             "ioctl KVM_GET_VCPU_MMAP_SIZE = {:#x}",
-            kvm.get_vcpu_mmap_size().unwrap()
+            ctx.get_kvm().get_vcpu_mmap_size().unwrap()
         );
 
         Guest {
