@@ -12,9 +12,17 @@ impl VCPU {
     pub fn new(vm: &VmFd) -> Self {
         // Create one vCPU
         let vcpu_fd = vm.create_vcpu(0).unwrap();
+        let vcpu = VCPU { vcpu_fd };
 
+        vcpu.init_regs();
+        vcpu.init_sregs();
+
+        vcpu
+    }
+
+    fn init_sregs(&self) {
         // x86_64 specific registry setup
-        let mut vcpu_sregs = vcpu_fd.get_sregs().unwrap();
+        let mut vcpu_sregs = self.vcpu_fd.get_sregs().unwrap();
 
         vcpu_sregs.cs.base = 0;
         vcpu_sregs.cs.limit = u32::MAX;
@@ -44,16 +52,16 @@ impl VCPU {
         vcpu_sregs.ss.db = 1;
         vcpu_sregs.cr0 |= 1; /* enable protected mode */
 
-        vcpu_fd.set_sregs(&vcpu_sregs).unwrap();
+        self.vcpu_fd.set_sregs(&vcpu_sregs).unwrap();
+    }
 
-        let mut vcpu_regs = vcpu_fd.get_regs().unwrap();
+    fn init_regs(&self) {
+        let mut vcpu_regs = self.vcpu_fd.get_regs().unwrap();
         vcpu_regs.rip = PROGRAM_START;
         vcpu_regs.rflags = 2;
-        vcpu_fd.set_regs(&vcpu_regs).unwrap();
+        self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
 
         println!("RIP = {:#x}", vcpu_regs.rip);
-
-        VCPU { vcpu_fd }
     }
 
     pub fn run(&mut self) {
