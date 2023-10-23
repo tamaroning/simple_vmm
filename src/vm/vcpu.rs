@@ -25,7 +25,7 @@ impl VCPU {
 
         vcpu_sregs.cs.base = 0;
         vcpu_sregs.cs.limit = u32::MAX;
-        vcpu_sregs.cs.g = 0;
+        vcpu_sregs.cs.g = 1;
 
         vcpu_sregs.ds.base = 0;
         vcpu_sregs.ds.limit = u32::MAX;
@@ -59,6 +59,9 @@ impl VCPU {
         vcpu_regs.rip = 0x10_0000;
         vcpu_regs.rsi = 0x1_0000;
         vcpu_regs.rflags = 2;
+
+        vcpu_regs.rax = 3;
+        vcpu_regs.rbx = 4;
         self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
     }
 
@@ -87,10 +90,14 @@ impl VCPU {
                     );
                 }
                 VcpuExit::IoOut(addr, data) => {
-                    println!(
-                        "Received an I/O out exit. Address: {:#x}. Data: {:#x}",
-                        addr, data[0],
-                    );
+                    if addr == 0x3f8 {
+                        print!("{}", data[0] as char);
+                    } else {
+                        println!(
+                            "Received an I/O in exit. Address: {:#x}. Data: {:#x}",
+                            addr, data[0],
+                        );
+                    }
                 }
                 VcpuExit::MmioRead(addr, _data) => {
                     println!("Received an MMIO Read Request for the address {:#x}.", addr);

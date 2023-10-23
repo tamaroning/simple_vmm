@@ -127,9 +127,30 @@ impl Guest {
                     *(image.as_ptr().wrapping_add(setup_size).wrapping_add(i));
             }
 
+            // overwrite kernel
+            // FIXME: remove this
+            const ASM_CODE: [u8; 12] = [
+                0xba, 0xf8, 0x03, /* mov $0x3f8, %dx */
+                0x00, 0xd8, /* add %bl, %al */
+                0x04, b'0', /* add $'0', %al */
+                0xee, /* out %al, (%dx) */
+                0xb0, b'\n', /* mov $'\n', %al */
+                0xee,  /* out %al, (%dx) */
+                0xf4,  /* hlt */
+            ];
+            const ASM_CODE_: [u8; 12] = [
+                0xc0, 0x31, 0x10, 0xe7, 0xeb, 0x40, 0x00, 0xfb, 0xf4, 0xf4, 0xf4, 0xf4,
+            ];
+            for i in 0..12 {
+                //*(kernel.wrapping_add(i)) = ASM_CODE[i];
+            }
+
             dbg!(*(kernel.wrapping_add(0)));
             dbg!(*(kernel.wrapping_add(1)));
             dbg!(*(kernel.wrapping_add(2)));
+            dbg!(*(kernel.wrapping_add(3)));
+            dbg!(*(kernel.wrapping_add(4)));
+            dbg!(*(kernel.wrapping_add(5)));
 
             dbg!(*(cmdline.wrapping_add(0)) as char);
             dbg!(*(cmdline.wrapping_add(1)) as char);
@@ -145,7 +166,6 @@ impl Guest {
             dbg!(*(cmdline.wrapping_add(11)) as char);
             dbg!(*(cmdline.wrapping_add(12)) as char);
             dbg!(*(cmdline.wrapping_add(13)) as char);
-
         }
     }
 
