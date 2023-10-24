@@ -3,15 +3,16 @@ mod vcpu;
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::VmFd;
 use linux_loader::loader::bootparam::{boot_params, CAN_USE_HEAP, KEEP_SEGMENTS};
-use vcpu::VCPU;
+use vcpu::Vcpu;
 
 use crate::Context;
 
 const MEM_SIZE: usize = 1 << 30; // 1GB
 
 pub struct Guest {
+    #[allow(unused)]
     vm: VmFd,
-    vcpu: VCPU,
+    vcpu: Vcpu,
     mem: *mut u8,
 }
 
@@ -54,7 +55,7 @@ impl Guest {
         );
 
         // Create and init vCPU
-        let vcpu = VCPU::new(ctx, &vm);
+        let vcpu = Vcpu::new(ctx, &vm);
 
         Guest { vcpu, vm, mem }
     }
@@ -89,11 +90,11 @@ impl Guest {
 
             // Initialize boot parameters
             println!(
-                "[LOG] Copy boot parameters to phys {:#x}",
+                "[LOG] Copy boot parameters to address {:#x}",
                 boot_params as usize - self.mem as usize
             );
             *boot_params = *(image.as_ptr() as *const boot_params);
-            let setup_sectors = boot_params.as_mut().unwrap().hdr.setup_sects as usize;
+            let setup_sectors = (*boot_params).hdr.setup_sects as usize;
             println!("[LOG] setup_sectors = {:#x}", setup_sectors);
             let setup_size = (setup_sectors + 1) * 512;
             (*boot_params).hdr.vid_mode = 0xFFFF; // VGA
@@ -106,7 +107,11 @@ impl Guest {
             (*boot_params).hdr.cmd_line_ptr = 0x2_0000;
 
             // Clear command line
-            println!("[LOG] Initalize kernel command line");
+            let cmdline_size = (*boot_params).hdr.cmdline_size;
+            println!(
+                "[LOG] Initalize kernel command line. size = {:#x}",
+                cmdline_size
+            );
             for i in 0..((*boot_params).hdr.cmdline_size) {
                 *(cmdline.wrapping_add(i as usize)) = 0;
             }
@@ -114,8 +119,8 @@ impl Guest {
             const TTY_STRING: [u8; 14] = [
                 b'c', b'o', b'n', b's', b'o', b'l', b'e', b'=', b't', b't', b'y', b'S', b'0', b'\0',
             ];
-            for i in 0..TTY_STRING.len() {
-                *(cmdline.wrapping_add(i)) = TTY_STRING[i];
+            for (i, c) in TTY_STRING.iter().enumerate() {
+                *(cmdline.wrapping_add(i)) = *c;
             }
 
             // Copy kernel part
@@ -129,43 +134,30 @@ impl Guest {
 
             // overwrite kernel
             // FIXME: remove this
-            const ASM_CODE: [u8; 12] = [
-                0xba, 0xf8, 0x03, /* mov $0x3f8, %dx */
+            /*
+            let asm_code_ = [
+                //0xba, 0xf8, 0x03, /* mov $0x3f8, %dx */
                 0x00, 0xd8, /* add %bl, %al */
-                0x04, b'0', /* add $'0', %al */
+                //0x04, b'0',  /* add $'0', %al */
                 0xee, /* out %al, (%dx) */
                 0xb0, b'\n', /* mov $'\n', %al */
                 0xee,  /* out %al, (%dx) */
                 0xf4,  /* hlt */
             ];
-            const ASM_CODE_: [u8; 12] = [
+
+            const ASM_CODE__: [u8; 12] = [
                 0xc0, 0x31, 0x10, 0xe7, 0xeb, 0x40, 0x00, 0xfb, 0xf4, 0xf4, 0xf4, 0xf4,
             ];
-            for i in 0..12 {
-                //*(kernel.wrapping_add(i)) = ASM_CODE[i];
+            let asm_code = [
+                0x0f, 0xa2, /* cpuid */
+                //0xba, 0x01, 0x00, /* mov $0x1, %dx */
+                0xee, /* out %al, (%dx) */
+                0xf4, /* hlt */
+            ];
+            for i in 0..asm_code.len() {
+                // *(kernel.wrapping_add(i)) = asm_code[i];
             }
-
-            dbg!(*(kernel.wrapping_add(0)));
-            dbg!(*(kernel.wrapping_add(1)));
-            dbg!(*(kernel.wrapping_add(2)));
-            dbg!(*(kernel.wrapping_add(3)));
-            dbg!(*(kernel.wrapping_add(4)));
-            dbg!(*(kernel.wrapping_add(5)));
-
-            dbg!(*(cmdline.wrapping_add(0)) as char);
-            dbg!(*(cmdline.wrapping_add(1)) as char);
-            dbg!(*(cmdline.wrapping_add(2)) as char);
-            dbg!(*(cmdline.wrapping_add(3)) as char);
-            dbg!(*(cmdline.wrapping_add(4)) as char);
-            dbg!(*(cmdline.wrapping_add(5)) as char);
-            dbg!(*(cmdline.wrapping_add(6)) as char);
-            dbg!(*(cmdline.wrapping_add(7)) as char);
-            dbg!(*(cmdline.wrapping_add(8)) as char);
-            dbg!(*(cmdline.wrapping_add(9)) as char);
-            dbg!(*(cmdline.wrapping_add(10)) as char);
-            dbg!(*(cmdline.wrapping_add(11)) as char);
-            dbg!(*(cmdline.wrapping_add(12)) as char);
-            dbg!(*(cmdline.wrapping_add(13)) as char);
+            */
         }
     }
 

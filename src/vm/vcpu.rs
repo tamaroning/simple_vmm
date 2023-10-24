@@ -4,14 +4,15 @@ use kvm_ioctls::VmFd;
 
 use crate::Context;
 
-pub struct VCPU {
+pub struct Vcpu {
     vcpu_fd: VcpuFd,
 }
 
-impl VCPU {
+impl Vcpu {
     pub fn new(ctx: &Context, vm: &VmFd) -> Self {
+        println!("[LOG] Initialize vCPU registers");
         let vcpu_fd = vm.create_vcpu(0).unwrap();
-        let vcpu = VCPU { vcpu_fd };
+        let vcpu = Vcpu { vcpu_fd };
 
         // x86_64 specific registry setup
         vcpu.init_sregs();
@@ -19,6 +20,22 @@ impl VCPU {
         vcpu.init_cpu_id(ctx);
         vcpu
     }
+
+    /*
+    fn dump(&self) {
+        let vcpu_regs = self.vcpu_fd.get_regs().unwrap();
+        println!("RIP = {:#x}", vcpu_regs.rip);
+        println!("RAX = {:#x}", vcpu_regs.rax);
+        println!("RBX = {:#x}", vcpu_regs.rbx);
+        println!("RCX = {:#x}", vcpu_regs.rcx);
+        println!("RDX = {:#x}", vcpu_regs.rdx);
+        println!("RSI = {:#x}", vcpu_regs.rsi);
+        println!("RDI = {:#x}", vcpu_regs.rdi);
+        println!("RBP = {:#x}", vcpu_regs.rbp);
+        println!("RSP = {:#x}", vcpu_regs.rsp);
+        println!("RFLAGS = {:#x}", vcpu_regs.rflags);
+    }
+    */
 
     fn init_sregs(&self) {
         let mut vcpu_sregs = self.vcpu_fd.get_sregs().unwrap();
@@ -60,44 +77,56 @@ impl VCPU {
         vcpu_regs.rsi = 0x1_0000;
         vcpu_regs.rflags = 2;
 
-        vcpu_regs.rax = 3;
-        vcpu_regs.rbx = 4;
+        vcpu_regs.rax = 0x40000000;
+        vcpu_regs.rbx = 1;
+        vcpu_regs.rcx = 0xffff;
+        vcpu_regs.rdx = 0xefef;
         self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
     }
 
     // See 4.20 KVM_SET_CPUID, https://www.kernel.org/doc/Documentation/virtual/kvm/api.txt
     fn init_cpu_id(&self, ctx: &Context) {
+        print!("[LOG] Initialize CPUID entry... ");
         const NUM_ENTRY: usize = kvm_bindings::KVM_MAX_CPUID_ENTRIES;
 
         let mut cpuid = ctx.get_kvm().get_supported_cpuid(NUM_ENTRY).unwrap();
         for entry in cpuid.as_mut_slice() {
-            if entry.function == /* KVM_CPUID_SIGNATURE */ 0x40000000 {
-                entry.eax = /* KVM_CPUID_FEATURES */ 0x40000001;
+            // https://www.kernel.org/doc/html/v5.7/virt/kvm/cpuid.html
+            if entry.function == /* KVM_CPUID_SIGNATURE */ 0x4000_0000 {
+                entry.eax = /* KVM_CPUID_FEATURES */ 0x4000_0001;
                 entry.ebx = 0x4b4d564b; // KVMK
                 entry.ecx = 0x564b4d56; // VMKV
                 entry.edx = 0x4d; // M
+                println!("Done");
             }
         }
+        self.vcpu_fd.set_cpuid2(&cpuid).unwrap();
     }
 
     pub fn run(&mut self) {
         loop {
             match self.vcpu_fd.run().expect("run failed") {
-                VcpuExit::IoIn(addr, data) => {
+                VcpuExit::IoIn(_addr, _data) => {
+                    // FIXME: ignore for now
+                    /*
                     println!(
                         "Received an I/O in exit. Address: {:#x}. Data: {:#x}",
                         addr, data[0],
                     );
+                    */
                 }
                 VcpuExit::IoOut(addr, data) => {
                     if addr == 0x3f8 {
                         print!("{}", data[0] as char);
                     } else {
-                        println!(
-                            "Received an I/O in exit. Address: {:#x}. Data: {:#x}",
-                            addr, data[0],
-                        );
+                        todo!();
                     }
+                    /*
+                    println!(
+                        "Received an I/O in exit. Address: {:#x}. Data: {:#x}",
+                        addr, data[0],
+                    );
+                    */
                 }
                 VcpuExit::MmioRead(addr, _data) => {
                     println!("Received an MMIO Read Request for the address {:#x}.", addr);
