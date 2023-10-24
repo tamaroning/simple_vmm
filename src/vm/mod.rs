@@ -11,6 +11,7 @@ const MEM_SIZE: usize = 1 << 30; // 1GB
 
 pub struct Guest {
     #[allow(unused)]
+    // FIXME: should remove this?
     vm: VmFd,
     vcpu: Vcpu,
     mem: *mut u8,
