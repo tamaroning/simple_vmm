@@ -1,7 +1,7 @@
 /target
 
 examples/*
-!examples/*.S
-!examples/test-bzImage*
+!examples/test-bzImage
+!examples/tiny.config
 
 .vscode
