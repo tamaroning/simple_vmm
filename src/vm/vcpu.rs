@@ -66,7 +66,7 @@ impl Vcpu {
     // TODO: move this to elsewhere?
     // See 4.20 KVM_SET_CPUID, https://www.kernel.org/doc/Documentation/virtual/kvm/api.txt
     fn init_cpu_id(&self, ctx: &Context) {
-        print!("[LOG] Initialize CPUID entry");
+        println!("[LOG] Initialize CPUID entry");
         const NUM_ENTRY: usize = kvm_bindings::KVM_MAX_CPUID_ENTRIES;
 
         let mut cpuid = ctx.get_kvm().get_supported_cpuid(NUM_ENTRY).unwrap();
