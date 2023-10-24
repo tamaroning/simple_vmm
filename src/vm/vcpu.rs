@@ -57,8 +57,8 @@ impl Vcpu {
 
     fn init_regs(&self) {
         let mut vcpu_regs = self.vcpu_fd.get_regs().unwrap();
-        vcpu_regs.rip = 0x10_0000;
-        vcpu_regs.rsi = 0x1_0000;
+        vcpu_regs.rip = 0x100000;
+        vcpu_regs.rsi = 0x10000;
         vcpu_regs.rflags = 2;
         self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
     }
@@ -72,8 +72,8 @@ impl Vcpu {
         for entry in cpuid.as_mut_slice() {
             // Define how to respond call to CPUID with EAX=<function>
             // See https://www.kernel.org/doc/html/v5.7/virt/kvm/cpuid.html
-            if entry.function == /* KVM_CPUID_SIGNATURE */ 0x4000_0000 {
-                entry.eax = /* KVM_CPUID_FEATURES */ 0x4000_0001;
+            if entry.function == /* KVM_CPUID_SIGNATURE */ 0x40000000 {
+                entry.eax = /* KVM_CPUID_FEATURES */ 0x40000001;
                 entry.ebx = 0x4b4d564b; // KVMK
                 entry.ecx = 0x564b4d56; // VMKV
                 entry.edx = 0x4d; // M

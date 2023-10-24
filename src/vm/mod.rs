@@ -82,9 +82,9 @@ impl Guest {
         println!("[LOG] Image size = {:#x}", image.len());
 
         unsafe {
-            let boot_params = self.mem.wrapping_add(0x1_0000) as *mut boot_params;
-            let cmdline = self.mem.wrapping_add(0x2_0000);
-            let kernel = self.mem.wrapping_add(0x10_0000);
+            let boot_params = self.mem.wrapping_add(0x10000) as *mut boot_params;
+            let cmdline = self.mem.wrapping_add(0x20000);
+            let kernel = self.mem.wrapping_add(0x100000);
 
             // Initialize boot parameters
             *boot_params = *(image.as_ptr() as *const boot_params);
@@ -97,7 +97,7 @@ impl Guest {
             (*boot_params).hdr.loadflags |= CAN_USE_HEAP as u8 | 0x01 | KEEP_SEGMENTS as u8;
             (*boot_params).hdr.heap_end_ptr = 0xFE00;
             (*boot_params).hdr.ext_loader_ver = 0x0;
-            (*boot_params).hdr.cmd_line_ptr = 0x2_0000;
+            (*boot_params).hdr.cmd_line_ptr = 0x20000;
 
             // Clear command line
             let cmdline_size = (*boot_params).hdr.cmdline_size;
