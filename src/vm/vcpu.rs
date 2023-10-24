@@ -63,6 +63,7 @@ impl Vcpu {
         self.vcpu_fd.set_regs(&vcpu_regs).unwrap();
     }
 
+    // TODO: move this to elsewhere?
     // See 4.20 KVM_SET_CPUID, https://www.kernel.org/doc/Documentation/virtual/kvm/api.txt
     fn init_cpu_id(&self, ctx: &Context) {
         print!("[LOG] Initialize CPUID entry");

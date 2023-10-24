@@ -92,6 +92,8 @@ impl Guest {
             let setup_size = (setup_sectors + 1) * 512;
             (*boot_params).hdr.vid_mode = 0xFFFF; // VGA
             (*boot_params).hdr.type_of_loader = 0xFF;
+            // TODO: initrd
+            // https://github.com/bobuhiro11/gokvm/blob/12d6157f506c057a742096e101f9274089203ebf/kvm/kvm.go
             (*boot_params).hdr.ramdisk_image = 0x0;
             (*boot_params).hdr.ramdisk_size = 0x0;
             (*boot_params).hdr.loadflags |= CAN_USE_HEAP as u8 | 0x01 | KEEP_SEGMENTS as u8;
@@ -109,11 +111,10 @@ impl Guest {
                 *(cmdline.wrapping_add(i as usize)) = 0;
             }
             // Append "console=ttyS0\0" to command line
-            const TTY_STRING: [u8; 14] = [
-                b'c', b'o', b'n', b's', b'o', b'l', b'e', b'=', b't', b't', b'y', b'S', b'0', b'\0',
-            ];
-            for (i, c) in TTY_STRING.iter().enumerate() {
-                *(cmdline.wrapping_add(i)) = *c;
+            const KERNEL_PARAMS: &str="console=ttyS0\0";
+            assert!(KERNEL_PARAMS.is_ascii());
+            for (i, c) in KERNEL_PARAMS.chars().map(|c| c  as u8).enumerate() {
+                *(cmdline.wrapping_add(i)) = c;
             }
 
             // Copy kernel part
